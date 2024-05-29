@@ -7,6 +7,9 @@ The analysis code (analysis and DDM fitting) is avalable at at: https://github.c
 Paths may need to be changed and processed data/model outputs generated in order to run scripts. 
 
 
+Make sure files in the matlab_dependencies folder are on your matlab path.
+
+
 In addition to the supporting files included, analysis scripts/model fitting rely on the following outside dependences:
 
 MATLAB
