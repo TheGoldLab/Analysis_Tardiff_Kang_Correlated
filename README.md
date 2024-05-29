@@ -1,6 +1,6 @@
 This folder contains analysis scripts used in the paper "Normative evidence weighting and accumulation in correlated environments" by Nathan Tardiff, Jiwon Kang, and Joshua I. Gold.
 
-The data are available at: https://osf.io/qj92c. 
+The data are available at: https://osf.io/qygkc/. 
 
 The analysis code (analysis and DDM fitting) is avalable at at: https://github.com/TheGoldLab/Analysis_Tardiff_Kang_Correlated.
 
