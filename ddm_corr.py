@@ -95,10 +95,27 @@ def preds_to_df(sols,undec=False,forced=False,err_RT=True):
 
 #more general function for generating predictions based on a pandas df of variable combinations.
 #as opposed to the fixed rho/mu rconds dict approach of gen_predict.
-def gen_predict_df(var_combos,model,**kwargs):
+def gen_predict_df(var_combos,model,method=None,**kwargs):
+    
+    if method is None:
+        meth = model.solve
+    elif method == "analytical":
+        meth = model.solve_analytical
+    elif method == "numerical":
+        meth = model.solve_numerical
+    elif method == "cn":
+        meth = model.solve_numerical_cn
+    elif method == "implicit":
+        meth = model.solve_numerical_implicit
+    elif method == "explicit":
+        meth = model.solve_numerical_explicit
+    else:
+        raise ValueError("Invalid method "+method)
+    
     sols = {}
     for _,r in var_combos.iterrows():
-        m = model.solve(r.to_dict())
+        m = meth(r.to_dict())
+        #m = model.solve(r.to_dict())
         mkey = frozenset(zip(r.index,r.values))
         sols[mkey] = m
     
@@ -107,19 +124,35 @@ def gen_predict_df(var_combos,model,**kwargs):
     return soldf
 
 #really I shouldn't be solving twice in sample and predict, but going w/ it for now
-def gen_predict(rconds,model,**kwargs):
+def gen_predict(rconds,model,method=None,**kwargs):
     '''
     gets theoretical predicted correct and errror probabilities and mean RTs for a given
     model (not fitted). Useful for plotting psychometric/chronometric functions.
     Values are based on analytical/numerical solutions to model
     '''
     
+    if method is None:
+        meth = model.solve
+    elif method == "analytical":
+        meth = model.solve_analytical
+    elif method == "numerical":
+        meth = model.solve_numerical
+    elif method == "cn":
+        meth = model.solve_numerical_cn
+    elif method == "implicit":
+        meth = model.solve_numerical_implicit
+    elif method == "explicit":
+        meth = model.solve_numerical_explicit
+    else:
+        raise ValueError("Invalid method "+method)
+    
     #solve the model for all conditions
     #print('Solving model for all conditions. May take a minute...')
     sols = {}
     for r,v in rconds.items():
         for mu in v:
-            m = model.solve({'mu': mu, 'rho':r})
+            m = meth({'mu': mu, 'rho':r})
+            #m = model.solve({'mu': mu, 'rho':r})
             mkey = frozenset([('mu',mu),('rho',r)])
             sols[mkey] = m
 
