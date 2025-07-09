@@ -1,4 +1,5 @@
 This folder contains analysis scripts used in the paper "Normative evidence weighting and accumulation in correlated environments" by Nathan Tardiff, Jiwon Kang, and Joshua I. Gold.
+Now published in eLife: https://doi.org/10.7554/eLife.100258.2
 
 The data are available at: https://osf.io/qygkc/. 
 
@@ -13,7 +14,6 @@ Make sure files in the matlab_dependencies folder are on your matlab path.
 In addition to the supporting files included, analysis scripts/model fitting rely on the following outside dependences:
 
 MATLAB
-- imatlab:			https://github.com/imatlab/imatlab	
 - VBA Toolbox:		https://mbb-team.github.io/VBA-toolbox/	
 
 Python

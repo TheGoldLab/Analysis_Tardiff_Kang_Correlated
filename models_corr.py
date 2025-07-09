@@ -3,14 +3,22 @@
 Created on Tue Feb 22 16:32:57 2022
 
 DDM specifications for: 
-"Normative evidence weighting and accumulation in correlated environments" 
-Tardiff et al., 2024.
+"Normative evidence weighing and accumulation in correlated environments" 
+Tardiff et al., 2025.
 
-@author: ntard
+@author: ntardiff
 """
 import numpy as np
 from ddm import Model, Fittable,Drift,Bound,Noise
 from ddm.models import NoiseConstant, BoundConstant, BoundCollapsingLinear, OverlayChain, OverlayNonDecision, OverlayUniformMixture
+
+
+#define fisher transforms (not still needed here but leaving in case used in scripts)
+def fisherz(r):
+    return 0.5*np.log((1+r)/(1-r))
+
+def fishezr(z):
+    return (np.exp(2*z)-1)/(np.exp(2*z)+1)
 
 
 # Need a subclass to make the drift rate vary linearly with SNR, from the tutorial (https://pyddm.readthedocs.io/en/latest/quickstart.html)
@@ -29,6 +37,24 @@ class DriftSNRCorr(Drift):
         }
         
         drift = v_switch[conditions['rho']]
+        
+        return drift * np.abs(conditions['mu'])
+    
+class DriftSNRRSharedRho(Drift):
+    name = 'Drift depends linearly on SNR, single drift adjusted by subjective rho-relative sd'
+    required_parameters = ['driftSNR0','Rn','Rp'] # <-- Parameters we want to include in the model
+    required_conditions = ['mu','rho'] # <-- Task parameters ("conditions"). Should be the same name as in the sample.
+    
+    # We must always define the get_drift function, which is used to compute the instantaneous value of drift.
+    def get_drift(self, conditions, **kwargs):
+        r_switch = {
+            -1.0 : self.Rn,
+            0.0 : 0.0,
+            1.0 : self.Rp
+        }
+        
+        sd_scale = np.sqrt(1+r_switch[np.sign(conditions['rho'])])
+        drift = self.driftSNR0 / sd_scale
         
         return drift * np.abs(conditions['mu'])
     
@@ -109,6 +135,33 @@ class BoundRScaleCollapsingLinearT(Bound):
         # scale = np.sqrt(1+r_switch[conditions['rho']])/np.sqrt(1+conditions['rho'])
         return Bt0*scale
     
+#same as above, but assumes separate rhos for bound scale factor and generative sd. Requires that sd rho also be estimated as part of drift.    
+class BoundR2ScaleCollapsingLinearT(Bound):
+    name = "Correlation-dependent bound w/ linear collapse, post-collapse normalization,separate fit rhos for scale factor and generative sd"
+    required_parameters = ["Rn", "B0", "Rp","RnB","RpB","t"]
+    required_conditions = ['rho']
+    def get_bound(self, t, conditions, *args, **kwargs):
+
+        #Trusting you're inputting the right correlations here!!!
+        r_switch_sd = {
+            -1.0 : self.Rn,
+            0.0 : 0.0,
+            1.0 : self.Rp
+        }
+        
+        r_switch_B = {
+            -1.0 : self.RnB,
+            0.0 : 0.0,
+            1.0 : self.RpB
+        }
+        
+        Bt0 = max(self.B0 - self.t*t, 0.)
+        
+        scale = (1+r_switch_B[np.sign(conditions['rho'])])/np.sqrt(1+conditions['rho']) #evidence weighting
+        scale /= np.sqrt(1+r_switch_sd[np.sign(conditions['rho'])]) #generative sd scaling
+
+        return Bt0*scale
+    
     
 class BoundSharedCollapsingLinearT(Bound):
     name = "Correlation-independent bound w/ linear collapse, adjusted by rho-relative sd"
@@ -122,14 +175,6 @@ class BoundSharedCollapsingLinearT(Bound):
         
         return Bt0/sd_scale
 
-    
-
-#define fisher transforms (not sure these are still needed here but leaving in case used in scripts)
-def fisherz(r):
-    return 0.5*np.log((1+r)/(1-r))
-
-def fishezr(z):
-    return (np.exp(2*z)-1)/(np.exp(2*z)+1)
 
     
 class NoiseCorr(Noise):
@@ -238,4 +283,36 @@ ddm_boundrsCLT_vk = Model(name='bound_rscaleCLT_vk',
         dx=0.005, dt=0.005, T_dur=T_dur) #Make T_dur just above max RT and make dt = 0.001
 
 
+#same as ddm_boundrsCLT_sk but drift scaled by subjective rho
+rho_hatn = Fittable(minval=-0.9, maxval=0.9)
+rho_hatp = Fittable(minval=-0.9, maxval=0.9)
+ddm_boundrsCLT_vrh = Model(name='bound_rscaleCLT_vrh',
+        drift=DriftSNRRSharedRho(driftSNR0=Fittable(minval=0,maxval=40),
+                              Rn=rho_hatn,
+                              Rp=rho_hatp),
+        noise=NoiseConstant(noise=1),
+        bound=BoundRScaleCollapsingLinearT(Rn=rho_hatn,
+                        B0=Fittable(minval=0.1, maxval=6),
+                        Rp=rho_hatp,
+                        t=Fittable(minval=0.0,maxval=6)),
+        overlay=OverlayChain(overlays=[OverlayNonDecision(nondectime=Fittable(minval=0, maxval=3)),
+                                        OverlayUniformMixture(umixturecoef=Fittable(minval=0.001, maxval=0.3))]),
+        dx=0.005, dt=0.005, T_dur=T_dur) #Make T_dur just above max RT and make dt = 0.001
+
+
+#drift and bound scaled by subjective rho sd, but bound scaling for evidence weighting is a potentially different rho
+ddm_boundrsCLT_vr2 = Model(name='bound_rscaleCLT_vr2',
+        drift=DriftSNRRSharedRho(driftSNR0=Fittable(minval=0,maxval=40),
+                              Rn=rho_hatn,
+                              Rp=rho_hatp),
+        noise=NoiseConstant(noise=1),
+        bound=BoundR2ScaleCollapsingLinearT(Rn=rho_hatn,
+                        B0=Fittable(minval=0.1, maxval=6),
+                        Rp=rho_hatp,
+                        RnB=Fittable(minval=-0.9, maxval=0.9),
+                        RpB=Fittable(minval=-0.9, maxval=0.9),
+                        t=Fittable(minval=0.0,maxval=6)),
+        overlay=OverlayChain(overlays=[OverlayNonDecision(nondectime=Fittable(minval=0, maxval=3)),
+                                        OverlayUniformMixture(umixturecoef=Fittable(minval=0.001, maxval=0.3))]),
+        dx=0.005, dt=0.005, T_dur=T_dur) #Make T_dur just above max RT and make dt = 0.001
 
